@@ -1,5 +1,7 @@
 import streamlit as st
 import pandas as pd
+from fpdf import FPDF
+from datetime import datetime
 
 # Configuración de la página estilo MikroTik
 st.set_page_config(page_title="Calculadora FTTH Pro", layout="centered")
@@ -31,9 +33,9 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.markdown("<h2 class='main-title'>⚙️ Calculadora FTTH Inteligente</h2>", unsafe_allow_html=True)
-st.write("Diagnóstico bidireccional automático con detección de fallas en drop y cdo.")
+st.write("Diagnóstico bidireccional automático con función de exportación de informes para cuadrillas.")
 
-# --- PARÁMETROS TÉCNICOS IDEALES (Simulación) ---
+# --- PARÁMETROS TÉCNICOS IDEALES ---
 PERDIDAS = {
     "70/30": {"pasante": 1.90, "abonado": 15.15},
     "50/50": {"pasante": 3.50, "abonado": 12.50},
@@ -55,7 +57,6 @@ for i in range(cantidad_cajas):
 # --- PUNTO DE MEDICIÓN FLEXIBLE ---
 st.subheader("📥 Datos de Medición en Campo")
 
-# Armamos la lista de opciones para que el usuario elija DÓNDE midió
 opciones_origen = ["NAP Directo"]
 for i, tipo in enumerate(estructura_ramal):
     opciones_origen.append(f"Caja {i+1} ({tipo}) - Boca Abonado")
@@ -70,51 +71,109 @@ with col1:
 with col2:
     val_video = st.number_input("Video 1550nm Medidos (dBm):", value=15.22, step=0.1)
 
-if st.button("🚀 Procesar Todo el Ramal y Diagnosticar"):
+# Función para armar el PDF de forma dinámica
+def generar_pdf_informe(datos_origen, tabla_df, punto_m, v_dat, v_vid):
+    pdf = FPDF()
+    pdf.add_page()
     
-    # --- PASO 1: Calcular la Entrada Absoluta de la Caja 1 (o NAP) ---
-    # Reconstruimos hacia atrás para saber el origen exacto
+    # Encabezado Estilo Tecnico
+    pdf.set_fill_color(0, 85, 255) # Azul institucional
+    pdf.rect(0, 0, 210, 35, "F")
+    
+    pdf.set_font("Arial", "B", 16)
+    pdf.set_text_color(255, 255, 255)
+    pdf.cell(0, 10, "INFORME TECNICO DE MEDICION FTTH", ln=True, align="L")
+    pdf.set_font("Arial", "", 10)
+    pdf.cell(0, 5, f"Fecha de emision: {datetime.now().strftime('%d/%m/%Y %H:%M')}", ln=True, align="L")
+    
+    pdf.ln(20)
+    pdf.set_text_color(0, 0, 0)
+    
+    # Seccion 1: Datos de la medicion de entrada
+    pdf.set_font("Arial", "B", 12)
+    pdf.cell(0, 8, "1. Datos Ingresados en Campo", ln=True)
+    pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+    pdf.ln(3)
+    
+    pdf.set_font("Arial", "", 10)
+    pdf.cell(0, 6, f"Punto donde se midio: {punto_m}", ln=True)
+    pdf.cell(0, 6, f"Valor Datos (1490nm) cargado: {v_dat} dBm", ln=True)
+    pdf.cell(0, 6, f"Valor Video (1550nm) cargado: {v_vid} dBm", ln=True)
+    pdf.ln(5)
+    
+    # Origen calculado de la red
+    pdf.set_fill_color(240, 244, 254)
+    pdf.set_font("Arial", "B", 10)
+    origen_texto = f" Origen Reconstruido en NAP -> Datos: {round(datos_origen['datos'], 2)} dBm  |  Video: {round(datos_origen['video'], 2)} dBm"
+    pdf.cell(0, 8, origen_texto, ln=True, fill=True)
+    pdf.ln(5)
+    
+    # Seccion 2: Tabla de Proyección
+    pdf.set_font("Arial", "B", 12)
+    pdf.cell(0, 8, "2. Proyeccion Teorica de la Cascada", ln=True)
+    pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+    pdf.ln(4)
+    
+    # Encabezados de tabla de PDF
+    pdf.setfont("Arial", "B", 9)
+    pdf.set_fill_color(220, 230, 255)
+    pdf.cell(40, 8, " Caja", 1, 0, "L", True)
+    pdf.cell(38, 8, " Datos Abonado", 1, 0, "C", True)
+    pdf.cell(38, 8, " Video Abonado", 1, 0, "C", True)
+    pdf.cell(37, 8, " Pasante Datos", 1, 0, "C", True)
+    pdf.cell(37, 8, " Pasante Video", 1, 1, "C", True)
+    
+    # Filas de la tabla
+    pdf.set_font("Arial", "", 9)
+    for _, fila in tabla_df.iterrows():
+        pdf.cell(40, 8, f" {fila['Caja']}", 1, 0, "L")
+        pdf.cell(38, 8, f"{fila['Datos Abonado']} dBm", 1, 0, "C")
+        pdf.cell(38, 8, f"{fila['Video Abonado']} dBm", 1, 0, "C")
+        pdf.cell(37, 8, f"{fila['Pasante Datos']}", 1, 0, "C")
+        pdf.cell(37, 8, f"{fila['Pasante Video']}", 1, 1, "C")
+        
+    pdf.ln(10)
+    pdf.set_font("Arial", "I", 9)
+    pdf.set_text_color(100, 100, 100)
+    pdf.cell(0, 5, "* Umbral minimo recomendado para Video (1550nm) en abonado: -8.00 dBm.", ln=True)
+    pdf.cell(0, 5, "* Valores calculados en base a coeficientes optimos de preconectorizado de cooperativa.", ln=True)
+    
+    return pdf.output()
+
+if st.button("🚀 Procesar Todo el Ramal y Diagnosticar"):
     in_caja1_d = val_datos
     in_caja1_v = val_video
     
     if punto_medido != "NAP Directo":
-        # Extraer el índice de caja desde el texto seleccionado
         partes = punto_medido.split(" ")
         idx_origen = int(partes[1]) - 1
         es_pasante = "Pasante" in punto_medido
         
-        # Primero sumamos la pérdida de la misma caja donde se midió
         tipo_propio = estructura_ramal[idx_origen]
         p_aplicada = PERDIDAS[tipo_propio]["pasante"] if es_pasante else PERDIDAS[tipo_propio]["abonado"]
         in_caja1_d += p_aplicada
         in_caja1_v += p_aplicada
         
-        # Luego sumamos los pasantes de todas las cajas previas
         for i in range(idx_origen - 1, -1, -1):
             in_caja1_d += PERDIDAS[estructura_ramal[i]]["pasante"]
             in_caja1_v += PERDIDAS[estructura_ramal[i]]["pasante"]
 
-    # --- PASO 2: Calcular toda la cascada Aguas Abajo desde el Origen Calculado ---
     resultados = []
     curr_d = in_caja1_d
     curr_v = in_caja1_v
     
     st.markdown("### 📊 Estado y Proyección Completa del Ramal")
-    
-    # Imprimimos el valor calculado en el Origen
-    st.info(f"**Punto de partida reconstruído en el inicio del tramo (NAP):** Datos: {round(in_caja1_d, 2)} dBm | Video: {round(in_caja1_v, 2)} dBm")
+    st.info(f"**Punto de partida reconstruído en el inicio (NAP):** Datos: {round(in_caja1_d, 2)} dBm | Video: {round(in_caja1_v, 2)} dBm")
     
     for idx, tipo in enumerate(estructura_ramal):
         p_pasante = PERDIDAS[tipo]["pasante"]
         p_abo = PERDIDAS[tipo]["abonado"]
         
-        # Teóricos calculados
         teorico_abo_d = curr_d - p_abo
         teorico_abo_v = curr_v - p_abo
         teorico_pas_d = curr_d - p_pasante if tipo != "Terminal" else None
         teorico_pas_v = curr_v - p_pasante if tipo != "Terminal" else None
         
-        # Guardamos datos para la tabla
         resultados.append({
             "Caja": f"Caja {idx+1} ({tipo})",
             "Datos Abonado": round(teorico_abo_d, 2),
@@ -123,32 +182,32 @@ if st.button("🚀 Procesar Todo el Ramal y Diagnosticar"):
             "Pasante Video": round(teorico_pas_v, 2) if teorico_pas_v is not None else "N/A"
         })
         
-        # Bloque de Diagnóstico Visual en vivo por cada Caja
         st.markdown(f"#### 📍 Análisis de Caja {idx+1} ({tipo})")
-        
-        # Validación de alertas críticas de video
         if teorico_abo_v < -8.0:
-            st.markdown(f"<div class='alert-box alert-error'>🔴 **CRÍTICO EN VIDEO:** El nivel óptico para TV en abonados es de {round(teorico_abo_v,2)} dBm. Está por debajo de -8 dBm. **Resultado:** La ONT va a pixelar fuerte o dará Sin Señal.</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='alert-box alert-error'>🔴 **CRÍTICO EN VIDEO:** El nivel óptico de TV es {round(teorico_abo_v,2)} dBm (Menor a -8 dBm). **ONT pixelará.**</div>", unsafe_allow_html=True)
         elif teorico_abo_v < -4.5:
-            st.markdown(f"<div class='alert-box alert-warning'>⚠️ **VIDEO BAJO:** Nivel en {round(teorico_abo_v,2)} dBm. Está en el límite de operación, cualquier conector sucio matará la TV.</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='alert-box alert-warning'>⚠️ **VIDEO BAJO:** Nivel en {round(teorico_abo_v,2)} dBm. Límite de operación operativa.</div>", unsafe_allow_html=True)
         else:
-            st.markdown(f"<div class='alert-box alert-ok'>🟢 **VIDEO ÓPTIMO:** {round(teorico_abo_v,2)} dBm. Potencia excelente para video RF Overlay.</div>", unsafe_allow_html=True)
-
-        # Si el usuario ingresó un valor real para esta caja, comparamos desvíos
-        if punto_medido != "NAP Directo":
-            partes = punto_medido.split(" ")
-            idx_M = int(partes[1]) - 1
-            
-            # Si estamos parados analizando la caja donde el usuario detectó problemas reales en su red anterior:
-            if idx == idx_M and val_datos < -22.0 and tipo == "70/30":
-                st.markdown("<div class='alert-box alert-error'>🚨 **DIAGNÓSTICO AUTOMÁTICO:** Se detecta una caída anormal en el Ramal. Si tus valores reales medidos no coinciden con esta tabla, tenés **Valor Pasante Mal (Suciedad Crítica o Fusión con Atenuación)** entre la NAP y esta caja. Revisar acopladores hembra.</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='alert-box alert-ok'>🟢 **VIDEO ÓPTIMO:** {round(teorico_abo_v,2)} dBm. Potencia excelente.</div>", unsafe_allow_html=True)
         
-        # Siguiente iteración
         if teorico_pas_d is not None:
             curr_d = teorico_pas_d
             curr_v = teorico_pas_v
 
-    # Mostrar la tabla final unificada
-    df = pd.DataFrame(resultados)
+    df_final = pd.DataFrame(resultados)
     st.markdown("### 📋 Tabla Resumen de Proyección Teórica")
-    st.dataframe(df.set_index("Caja"), use_container_width=True)
+    st.dataframe(df_final.set_index("Caja"), use_container_width=True)
+    
+    # --- BOTÓN PARA DESCARGAR EL INFORME EN PDF GENERADO ---
+    st.markdown("---")
+    st.markdown("### 📥 Guardar Reporte Técnico")
+    
+    datos_origen_dict = {"datos": in_caja1_d, "video": in_caja1_v}
+    pdf_bytes = generar_pdf_informe(datos_origen_dict, df_final, punto_medido, val_datos, val_video)
+    
+    st.download_button(
+        label="📄 Descargar Informe de Diagnóstico (PDF)",
+        data=pdf_bytes,
+        file_name=f"Informe_Tramo_FTTH_{datetime.now().strftime('%d%m%Y')}.pdf",
+        mime="application/pdf"
+    )
