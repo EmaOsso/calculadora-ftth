@@ -71,7 +71,7 @@ with col1:
 with col2:
     val_video = st.number_input("Video 1550nm Medidos (dBm):", value=15.22, step=0.1)
 
-# Función corregida para armar el PDF
+# Función optimizada para retornar bytes limpios compatibles con Streamlit
 def generar_pdf_informe(datos_origen, tabla_df, punto_m, v_dat, v_vid):
     pdf = FPDF()
     pdf.add_page()
@@ -114,7 +114,7 @@ def generar_pdf_informe(datos_origen, tabla_df, punto_m, v_dat, v_vid):
     pdf.line(10, pdf.get_y(), 200, pdf.get_y())
     pdf.ln(4)
     
-    # Encabezados de tabla de PDF (Corregido set_font)
+    # Encabezados de tabla de PDF
     pdf.set_font("Arial", "B", 9)
     pdf.set_fill_color(220, 230, 255)
     pdf.cell(40, 8, " Caja", 1, 0, "L", True)
@@ -138,7 +138,8 @@ def generar_pdf_informe(datos_origen, tabla_df, punto_m, v_dat, v_vid):
     pdf.cell(0, 5, "* Umbral minimo recomendado para Video (1550nm) en abonado: -8.00 dBm.", ln=True)
     pdf.cell(0, 5, "* Valores calculados en base a coeficientes optimos de preconectorizado de cooperativa.", ln=True)
     
-    return pdf.output()
+    # Retornamos los bytes codificados en formato puro
+    return pdf.output().encode('latin-1')
 
 if st.button("🚀 Procesar Todo el Ramal y Diagnosticar"):
     in_caja1_d = val_datos
