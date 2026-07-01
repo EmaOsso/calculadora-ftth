@@ -71,12 +71,12 @@ with col1:
 with col2:
     val_video = st.number_input("Video 1550nm Medidos (dBm):", value=15.22, step=0.1)
 
-# Función para armar el PDF de forma dinámica
+# Función corregida para armar el PDF
 def generar_pdf_informe(datos_origen, tabla_df, punto_m, v_dat, v_vid):
     pdf = FPDF()
     pdf.add_page()
     
-    # Encabezado Estilo Tecnico
+    # Encabezado Estilo Técnico
     pdf.set_fill_color(0, 85, 255) # Azul institucional
     pdf.rect(0, 0, 210, 35, "F")
     
@@ -89,7 +89,7 @@ def generar_pdf_informe(datos_origen, tabla_df, punto_m, v_dat, v_vid):
     pdf.ln(20)
     pdf.set_text_color(0, 0, 0)
     
-    # Seccion 1: Datos de la medicion de entrada
+    # Sección 1: Datos de la medición de entrada
     pdf.set_font("Arial", "B", 12)
     pdf.cell(0, 8, "1. Datos Ingresados en Campo", ln=True)
     pdf.line(10, pdf.get_y(), 200, pdf.get_y())
@@ -108,14 +108,14 @@ def generar_pdf_informe(datos_origen, tabla_df, punto_m, v_dat, v_vid):
     pdf.cell(0, 8, origen_texto, ln=True, fill=True)
     pdf.ln(5)
     
-    # Seccion 2: Tabla de Proyección
+    # Sección 2: Tabla de Proyección
     pdf.set_font("Arial", "B", 12)
     pdf.cell(0, 8, "2. Proyeccion Teorica de la Cascada", ln=True)
     pdf.line(10, pdf.get_y(), 200, pdf.get_y())
     pdf.ln(4)
     
-    # Encabezados de tabla de PDF
-    pdf.setfont("Arial", "B", 9)
+    # Encabezados de tabla de PDF (Corregido set_font)
+    pdf.set_font("Arial", "B", 9)
     pdf.set_fill_color(220, 230, 255)
     pdf.cell(40, 8, " Caja", 1, 0, "L", True)
     pdf.cell(38, 8, " Datos Abonado", 1, 0, "C", True)
