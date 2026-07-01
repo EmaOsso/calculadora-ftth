@@ -71,7 +71,7 @@ with col1:
 with col2:
     val_video = st.number_input("Video 1550nm Medidos (dBm):", value=15.22, step=0.1)
 
-# Función modificada para exportación limpia de bytes crudos
+# Función corregida que garantiza el retorno de <class 'bytes'> puros
 def generar_pdf_informe(datos_origen, tabla_df, punto_m, v_dat, v_vid):
     pdf = FPDF()
     pdf.add_page()
@@ -138,11 +138,11 @@ def generar_pdf_informe(datos_origen, tabla_df, punto_m, v_dat, v_vid):
     pdf.cell(0, 5, "* Umbral minimo recomendado para Video (1550nm) en abonado: -8.00 dBm.", ln=True)
     pdf.cell(0, 5, "* Valores calculados en base a coeficientes optimos de preconectorizado de cooperativa.", ln=True)
     
-    # Retornamos la salida forzada a formato string/bytes compatible directo con Streamlit
-    out = pdf.output(dest='S')
-    if isinstance(out, str):
-        return out.encode('latin-1')
-    return out
+    # Obtenemos la salida cruda de fpdf2
+    salida_cruda = pdf.output()
+    
+    # Forzamos la transformación estricta a un objeto inmutable de bytes puros
+    return bytes(salida_cruda)
 
 if st.button("🚀 Procesar Todo el Ramal y Diagnosticar"):
     in_caja1_d = val_datos
@@ -209,6 +209,7 @@ if st.button("🚀 Procesar Todo el Ramal y Diagnosticar"):
     datos_origen_dict = {"datos": in_caja1_d, "video": in_caja1_v}
     
     try:
+        # Ejecuta la función que ahora devuelve <class 'bytes'> obligatoriamente
         pdf_bytes = generar_pdf_informe(datos_origen_dict, df_final, punto_medido, val_datos, val_video)
         
         st.download_button(
