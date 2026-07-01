@@ -71,13 +71,13 @@ with col1:
 with col2:
     val_video = st.number_input("Video 1550nm Medidos (dBm):", value=15.22, step=0.1)
 
-# Función optimizada para retornar bytes limpios compatibles con Streamlit
+# Función modificada para exportación limpia de bytes crudos
 def generar_pdf_informe(datos_origen, tabla_df, punto_m, v_dat, v_vid):
     pdf = FPDF()
     pdf.add_page()
     
     # Encabezado Estilo Técnico
-    pdf.set_fill_color(0, 85, 255) # Azul institucional
+    pdf.set_fill_color(0, 85, 255) 
     pdf.rect(0, 0, 210, 35, "F")
     
     pdf.set_font("Arial", "B", 16)
@@ -138,8 +138,11 @@ def generar_pdf_informe(datos_origen, tabla_df, punto_m, v_dat, v_vid):
     pdf.cell(0, 5, "* Umbral minimo recomendado para Video (1550nm) en abonado: -8.00 dBm.", ln=True)
     pdf.cell(0, 5, "* Valores calculados en base a coeficientes optimos de preconectorizado de cooperativa.", ln=True)
     
-    # Retornamos los bytes codificados en formato puro
-    return pdf.output().encode('latin-1')
+    # Retornamos la salida forzada a formato string/bytes compatible directo con Streamlit
+    out = pdf.output(dest='S')
+    if isinstance(out, str):
+        return out.encode('latin-1')
+    return out
 
 if st.button("🚀 Procesar Todo el Ramal y Diagnosticar"):
     in_caja1_d = val_datos
@@ -185,7 +188,7 @@ if st.button("🚀 Procesar Todo el Ramal y Diagnosticar"):
         
         st.markdown(f"#### 📍 Análisis de Caja {idx+1} ({tipo})")
         if teorico_abo_v < -8.0:
-            st.markdown(f"<div class='alert-box alert-error'>🔴 **CRÍTICO EN VIDEO:** El nivel óptico de TV es {round(teorico_abo_v,2)} dBm (Menor a -8 dBm). **ONT pixelará.**</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='alert-box alert-error'>🔴 **CRÍTICO EN VIDEO:** El level óptico de TV es {round(teorico_abo_v,2)} dBm (Menor a -8 dBm). **ONT pixelará.**</div>", unsafe_allow_html=True)
         elif teorico_abo_v < -4.5:
             st.markdown(f"<div class='alert-box alert-warning'>⚠️ **VIDEO BAJO:** Nivel en {round(teorico_abo_v,2)} dBm. Límite de operación operativa.</div>", unsafe_allow_html=True)
         else:
@@ -204,11 +207,15 @@ if st.button("🚀 Procesar Todo el Ramal y Diagnosticar"):
     st.markdown("### 📥 Guardar Reporte Técnico")
     
     datos_origen_dict = {"datos": in_caja1_d, "video": in_caja1_v}
-    pdf_bytes = generar_pdf_informe(datos_origen_dict, df_final, punto_medido, val_datos, val_video)
     
-    st.download_button(
-        label="📄 Descargar Informe de Diagnóstico (PDF)",
-        data=pdf_bytes,
-        file_name=f"Informe_Tramo_FTTH_{datetime.now().strftime('%d%m%Y')}.pdf",
-        mime="application/pdf"
-    )
+    try:
+        pdf_bytes = generar_pdf_informe(datos_origen_dict, df_final, punto_medido, val_datos, val_video)
+        
+        st.download_button(
+            label="📄 Descargar Informe de Diagnóstico (PDF)",
+            data=pdf_bytes,
+            file_name=f"Informe_Tramo_FTTH_{datetime.now().strftime('%d%m%Y')}.pdf",
+            mime="application/pdf"
+        )
+    except Exception as e:
+        st.error(f"Error generando el archivo de descarga: {str(e)}")
