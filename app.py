@@ -31,7 +31,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.markdown("<h2 class='main-title'>⚙️ Calculadora FTTH Inteligente</h2>", unsafe_allow_html=True)
-st.write("Diagnóstico bidireccional automático con detección de fallas en mangueras drop y troncales.")
+st.write("Diagnóstico bidireccional automático con detección de fallas en drop y cdo.")
 
 # --- PARÁMETROS TÉCNICOS IDEALES (Simulación) ---
 PERDIDAS = {
